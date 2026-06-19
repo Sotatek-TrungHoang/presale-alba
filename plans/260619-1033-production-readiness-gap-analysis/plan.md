@@ -37,9 +37,10 @@ Plan này là kết quả **deep audit độc lập 7 chiều** (security, payme
 | Mobile + integration | 3 | 4 | 4 | 4 | ~13.5 | `research/07-...` |
 | **Raw total** | **~20** | **~30+** | **~30+** | **~15+** | **~113.5** | |
 
-**Estimate go-live (re-bucketed theo phase, gồm ~15% buffer PM/integration/QA): ~110–120 man-days.**
-- 1 backend dev solo: ~5–6 tháng.
-- Squad 3–5 dev (chạy song song theo critical path): ~10–13 tuần.
+**Estimate go-live — bản gốc 7-chiều (re-bucketed, ~15% buffer): ~110–120 man-days.**
+- 1 backend dev solo: ~5–6 tháng. Squad 3–5 dev song song: ~10–13 tuần.
+
+> ⚠️ **Con số gốc này CHƯA gồm Phase 8–11.** Sau Phase 8 (game perf) + coverage sweep (Phase 9–11: compliance, perf-ngoài-games, correctness/ops), **estimate full-scope revised = ~163–202 man-days**. Xem chi tiết ở mục **"Coverage extension"** bên dưới. Dùng range revised cho báo giá.
 
 ## Phases
 
@@ -53,10 +54,39 @@ Plan này là kết quả **deep audit độc lập 7 chiều** (security, payme
 | 6 | [Mobile Hardening & API Contract](./phase-06-mobile-hardening-api-contract.md) | P1 | ~13.5 | Pending |
 | 7 | [Test Coverage & Quality Gate](./phase-07-test-coverage-quality-gate.md) | P2 | ~30 | Pending |
 | 8 | [Game Performance Optimization](./phase-08-game-performance.md) | P2 | ~6 core / ~10 full | Pending |
+| 9 | [Compliance, Legal & Transactional Comms](./phase-09-compliance-legal-comms.md) | P1 | ~11–15 | Pending |
+| 10 | [Platform Performance & Scale (non-games)](./phase-10-platform-performance-scale.md) | P1 | ~14–19 | Pending |
+| 11 | [Correctness & Operational Hardening](./phase-11-correctness-ops-hardening.md) | P1 | ~11–14 | Pending |
 
 > Post red-team: Phase 1 ↑ (promote double-payout/graceful-shutdown/complaints/leaderboards), Phase 2 ↓ (double-payout chuyển sang P1, webhook handlers không rebuild), Phase 7 ↑ (mobile test từ-zero realistic). **Tổng full-scope ~120–140md.** Defer recommendations (D1–D5) có thể giảm ~25–35md cho bản go-live MVP — chờ user quyết.
 
 > **Phase 8 (Game Performance, P2, ~6md core / ~10md full)** thêm sau, theo yêu cầu khách quan tâm performance domain games. Đây là deliverable **bổ sung ngoài** scope go-live blocker — phần lớn finding là *net-new* (N+1 payout-review, cache suggested/nearby, mobile react-query), một phần *overlap có chủ đích* với Phase 3 (index `date`/`status`, pagination DB-07) đã đánh dấu để **không double-count**. State machine của game lifecycle (tham chiếu nghiệp vụ + chỗ chưa enforce) ở `reports/08-game-lifecycle-state-machine.md`.
+
+## Coverage extension (Prompt A sweep — 2026-06-19)
+
+Audit 7-chiều ban đầu scope theo lens cố định; **performance/scalability + compliance + correctness/ops bị hoà tan hoặc bỏ sót**. Coverage sweep (`reports/09-coverage-matrix-uncovered-dimensions.md`) phát hiện **14 dimension chưa/mới-một-phần được audit** (23 finding) → đóng gói vào Phase 9–11.
+
+**Scope quyết định (khách + assumption, 2026-06-19):**
+- Scale **growth-ready 10k+** (khách chọn) → Phase 10 full (perf-ngoài-games, search index, rate-limit, WS-scale, moderation enforcement).
+- **Compliance UK/EU IN-SCOPE** (assumption khách xác nhận) → Phase 9 full (GDPR đầy đủ + store-mandatory + email); AML nhẹ vì Stripe lo.
+- **Timezone/CVE/versioning/observability = correctness/ops IN** (không phụ thuộc scope) → Phase 11. Khách chốt: **CVE patch-only (không NestJS major)**, **`/v1/games` sunset** (mobile 0 reference, verified).
+- **a11y + i18n DEFER post-launch** (khách xác nhận) → backlog, ~5–7md (a11y) + ~6–10md (i18n) khi làm. **Timezone KHÔNG defer** (là bug, ở Phase 11).
+
+| Phase mới | Est (md) | Overlap đã trừ |
+|-----------|:-:|----------------|
+| 9 — Compliance, Legal & Comms | ~11–15 | — |
+| 10 — Platform Performance & Scale | ~14–19 | RATE-01 net sau overlap INF (Phase 5); index gộp Phase 3 |
+| 11 — Correctness & Ops Hardening | ~11–14 | DEP patch-only, VER sunset (đã thu hẹp) |
+| **Cộng thêm** | **~36–48** | |
+
+### Estimate tổng (revised, range — presale)
+- **Full-scope (Phase 1–11, growth-ready + UK/EU compliance, mọi D-item IN):** ~**162–198 man-days** = post-red-team core (~120–140) + Phase 8 (~6–10) + Phase 9–11 (~36–48).
+- **★ Recommended scope (khách chốt 2026-06-19) = full-scope TRỪ D2 (god-service refactor) + D3 (broad test coverage):** ~**150–186 man-days**.
+  - D1 Redis **IN** (growth-ready multi-instance), D4 FK sweep **IN**, D5 stubs **implement** (production-grade).
+  - D2 + D3 **defer post-launch** (~14–18md tiết kiệm) — không chặn launch.
+  - a11y + i18n defer post-launch (~11–17md khi làm sau).
+- 1 backend dev solo: ~7.5–9.5 tháng. Squad 3–5 dev song song: ~13–19 tuần.
+- **Đây là RANGE presale.** Biên độ còn lại: estimate point-fix chưa nhân hệ số integration/QA per-phase + vài Open Q nhỏ (CDN/DR budget, moderation tooling). Assumptions Q8/Q11/Q13 đã chốt (retention 6yr, SendGrid, pg_trgm, rate-limit defaults) — cần khách xác nhận lần cuối, biên độ ±~5md.
 
 ## Go-live gate (Definition of Ready for production)
 
@@ -97,6 +127,15 @@ Không có plan nào khác đang mở trong `./plans/` (chỉ có `reports/secur
 5. **Mobile timeslot EVENING**: thêm vào backend enum hay bỏ khỏi mobile? (MOB-01)
 6. **Scope go-live**: launch backend+mobile cùng lúc hay backend trước?
 
+### Open questions — Coverage extension (Phase 9–11)
+7. ~~Market UK/EU?~~ **RESOLVED:** UK/EU in-scope (assumption khách) → Phase 9 full.
+8. **Retention data tài chính** bao lâu + email provider (SendGrid/SES/Resend)? (Phase 9 — còn mở)
+9. ~~NestJS major upgrade?~~ **RESOLVED:** patch-only (DEP-01 = 2md).
+10. ~~Client nào gọi `/v1/games`?~~ **RESOLVED:** mobile 0 reference → sunset (VER-01 = 1md). Risk +1-2md nếu có client ẩn.
+11. **Search backend**: `pg_trgm` (rẻ, đủ) hay full-text/Elasticsearch (đắt, scale lớn)? (Phase 10 — còn mở)
+12. ~~a11y/i18n defer?~~ **RESOLVED:** defer post-launch (khách xác nhận).
+13. **Rate-limit ngưỡng** + có cần moderation dashboard cho admin? (cần product input, Phase 10 — còn mở)
+
 ---
 
 ## Red Team Review
@@ -136,15 +175,21 @@ Red-team xác nhận các Critical headline đúng, NHƯNG tìm ra **lỗi factu
 #### Estimate correction
 - **Mobile test (Phase 7): 12md → ~20–40md** (162 file / ~34k LOC từ zero + mock native Stripe/Firebase/Mapbox). Phase 7 nâng lên ~30md; **tổng go-live ~120–140md** (full scope).
 
-#### Defer recommendations — GO-LIVE MVP vs POST-LAUNCH (cần user quyết, KHÔNG tự cắt)
-> User đã chọn scope "full/enterprise". Đây là đề xuất resequencing cho go-live, không xoá scope. Cần xác nhận.
-| # | Hạng mục | Đề xuất | Tiết kiệm cho launch |
-|---|---------|---------|---------------------|
-| D1 | Redis adapter / horizontal scaling (Phase 5 INF-05/06) | Defer nếu go-live = 1 instance (chờ Q3) | ~2–4md |
-| D2 | God-service refactor (Phase 4 F-05) | Defer post-launch (regression risk cao trên money code) | ~4–6md |
-| D3 | Phase 7 broad coverage + strict-mode | Risk-target money/auth + mobile critical flow cho launch | ~10–12md |
-| D4 | Phase 3 broad FK sweep | Giữ DB-01/02/06, defer index-every-FK | ~4–5md |
-| D5 | Stub implement-vs-remove (Phase 4) | Default **remove/guard**, không implement (chờ Q2) | varies |
+#### Defer recommendations — RESOLVED (khách quyết 2026-06-19)
+| # | Hạng mục | **Quyết định** | Tác động |
+|---|---------|---------|---------|
+| D1 | Redis adapter / horizontal scaling (Phase 5 INF-05/06) | **IN** — growth-ready 10k+ ⇒ multi-instance ⇒ Socket.IO/cache cần Redis pub/sub bus (1 instance thì không cần) | trong full-scope (~2–4md) |
+| D2 | God-service refactor (Phase 4 F-05) | **DEFER** post-launch (regression risk cao trên money code) | -4–6md khỏi launch |
+| D3 | Phase 7 broad coverage + strict-mode | **DEFER** — target money/auth/critical-flow cho launch | -10–12md khỏi launch |
+| D4 | Phase 3 broad FK sweep | **IN** — production-grade; KHÔNG trùng PERF-02 (date/status) hay SCALE (trgm name), chỉ là phần FK tail của DB-05 | trong full-scope (~4–5md) |
+| D5 | Stub implement-vs-remove (Phase 4) | **IN — implement** (production-grade, improve sản phẩm; không remove) | trong full-scope (Phase 4 feature-completeness) |
+
+**Net scope sau quyết định = full-scope TRỪ D2 + D3 ≈ ~150–186 man-days** (xem "Coverage extension" cho breakdown).
+
+#### Assumptions đã chốt (khách + Claude, 2026-06-19) — cần khách xác nhận lần cuối
+- **Q8 retention tài chính:** assume **6 năm** (chuẩn HMRC/UK) → erasure tách PII khỏi `Transaction` ledger, giữ ledger ẩn danh 6 năm. **Email provider:** assume **SendGrid**.
+- **Q11 search:** **pg_trgm** (GIN index) — đủ cho ~3k course + 10k-100k user; KHÔNG Elasticsearch. (Hiện codebase: ILIKE `contains` thuần, 0 index name, `courses` hardcode `take:5`.)
+- **Q13 rate-limit:** global ~100 req/phút/user; write nhạy cảm ~10/phút; complaint ~5/phút. **Moderation dashboard: KHÔNG** build cho MVP (apply-action qua admin endpoint sẵn có).
 
 #### Unresolved conflict (KHÔNG tự ý quyết)
 - **PAY-02 custody**: main flow verified nhất quán (destination charges). Cần đọc `v1/games:298` path để xác nhận v1 có custody khác không → đưa vào task verify ở Phase 1/2 + Open Q1.
