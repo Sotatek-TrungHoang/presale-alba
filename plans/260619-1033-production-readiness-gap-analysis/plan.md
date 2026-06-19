@@ -52,8 +52,11 @@ Plan này là kết quả **deep audit độc lập 7 chiều** (security, payme
 | 5 | [Reliability & Infrastructure](./phase-05-reliability-infrastructure.md) | P1 | ~15 | Pending |
 | 6 | [Mobile Hardening & API Contract](./phase-06-mobile-hardening-api-contract.md) | P1 | ~13.5 | Pending |
 | 7 | [Test Coverage & Quality Gate](./phase-07-test-coverage-quality-gate.md) | P2 | ~30 | Pending |
+| 8 | [Game Performance Optimization](./phase-08-game-performance.md) | P2 | ~6 core / ~10 full | Pending |
 
 > Post red-team: Phase 1 ↑ (promote double-payout/graceful-shutdown/complaints/leaderboards), Phase 2 ↓ (double-payout chuyển sang P1, webhook handlers không rebuild), Phase 7 ↑ (mobile test từ-zero realistic). **Tổng full-scope ~120–140md.** Defer recommendations (D1–D5) có thể giảm ~25–35md cho bản go-live MVP — chờ user quyết.
+
+> **Phase 8 (Game Performance, P2, ~6md core / ~10md full)** thêm sau, theo yêu cầu khách quan tâm performance domain games. Đây là deliverable **bổ sung ngoài** scope go-live blocker — phần lớn finding là *net-new* (N+1 payout-review, cache suggested/nearby, mobile react-query), một phần *overlap có chủ đích* với Phase 3 (index `date`/`status`, pagination DB-07) đã đánh dấu để **không double-count**. State machine của game lifecycle (tham chiếu nghiệp vụ + chỗ chưa enforce) ở `reports/08-game-lifecycle-state-machine.md`.
 
 ## Go-live gate (Definition of Ready for production)
 
@@ -79,6 +82,7 @@ Phase 4 (features/code-health) ── parallel after P1, lower risk
 - **Phase 2 ⟶ Phase 6**: quyết định "canonical payment flow" (`/games` vs `/v1/games`) ở Phase 2 mở khoá fix contract `EVENING`/`CONFIRMED` ở Phase 6 (xem PAY-02, MOB-01).
 - **Phase 5 & Phase 7 song song**: CI (P5) là tiền đề để coverage gate (P7) có hiệu lực.
 - **Phase 3** nên đi cùng Phase 2 (financial writes cần transaction + index).
+- **Phase 8 (game perf)** phụ thuộc Phase 3: gộp index migration (PERF-02) + dùng chuẩn pagination DB-07 (PERF-04, 0 net). Cache đa-instance (PERF-03) gắn quyết định Redis ở Phase 5 (D1). react-query (PERF-07) phối smoke test Phase 7. Không phải go-live blocker → chạy sau Phase 1–3.
 
 ## Cross-plan dependencies
 
