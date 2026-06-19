@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "613832455558",
+    "project_id": "alba-social-prod",
+    "storage_bucket": "alba-social-prod.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:613832455558:android:fd987868c357280720a807",
+        "android_client_info": {
+          "package_name": "com.davros.alba"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCALsg4CehDpyskxft7a5DEOcvwbe1TZV4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

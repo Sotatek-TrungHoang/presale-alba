@@ -1,0 +1,7 @@
+-- AlterTable
+ALTER TABLE "Game" ADD COLUMN     "distance" INTEGER,
+ADD COLUMN     "handicap_max" DOUBLE PRECISION,
+ADD COLUMN     "handicap_min" DOUBLE PRECISION,
+ADD COLUMN     "lat" DOUBLE PRECISION,
+ADD COLUMN     "lng" DOUBLE PRECISION,
+ADD COLUMN     "location" TEXT;

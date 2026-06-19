@@ -1,0 +1,993 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                        String                    @id @default(uuid())
+  auth_id                   String                    @unique
+  admin_status              Boolean
+  email                     String?
+  profile                   Profile?
+  onboarding                UserOnboarding? // New relation for onboarding data
+  course_reviews            CourseReview[]
+  course_condition_reports  CourseCondition[]
+  group_memberships         GroupMember[]
+  league_players            LeaguePlayer[]
+  followers                 Follow[]                  @relation("follower")
+  following                 Follow[]                  @relation("following")
+  favourite_courses         FavouriteCourse[]
+  created_games             Game[]                    @relation("CreatedGames")
+  game_players              GamePlayer[]
+  comments                  Comment[]
+  likes                     Like[]
+  posts                     Post[]
+  player_scores             PlayerScore[]
+  conversations             ConversationParticipant[]
+  messages                  Message[]
+  stripe_customer_id        String?                   @unique // For Stripe Customer object
+  created_at                DateTime                  @default(now())
+  updated_at                DateTime                  @updatedAt
+  deleted_at                DateTime?
+  last_active_at            DateTime?
+  latestLocation            UserLocation? // Stores the latest known location of the user
+  stripe_account            StripeAccount? // Relation to StripeAccount
+  Transaction               Transaction[]
+  complaints_as_complainant Complaint[]               @relation("ComplaintComplainant")
+  complaints_as_resolver    Complaint[]               @relation("ComplaintResolver")
+
+  // Notification related fields
+  push_tokens           PushToken[]
+  notifications         Notification[]
+  notification_settings NotificationSettings?
+
+  // Moderation relations
+  blocks_initiated Block[]  @relation("Blocker")
+  blocks_received  Block[]  @relation("Blocked")
+  reports          Report[] @relation("UserReports")
+
+  // Marketing attribution captured at signup
+  attributions Attribution[]
+
+  @@index([last_active_at])
+}
+
+// Deep-link attribution captured by the mobile app at signup. Records which
+// campaign / link a user originated from (first-touch and last-touch). The
+// touch payloads are stored as JSON to stay flexible as we add link params.
+model Attribution {
+  id          String   @id @default(uuid())
+  user_id     String
+  user        User     @relation(fields: [user_id], references: [id])
+  method      String // registration method: email | google | apple
+  first_touch Json? // first campaign/link that brought this install in
+  last_touch  Json? // most recent campaign/link touch before signup
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@index([user_id])
+}
+
+// A web-layer click on a generic entrypoint link (GET /go). Anonymous (no
+// user yet) — gives campaign-click analytics independent of whether the
+// visitor ends up installing. The full query string is kept in `params`.
+model LinkClick {
+  id         String   @id @default(uuid())
+  source     String? // utm_source
+  medium     String? // utm_medium
+  campaign   String? // utm_campaign
+  content    String? // utm_content
+  term       String? // utm_term
+  ref        String? // referral token
+  params     Json? // full raw query string
+  user_agent String?
+  referer    String?
+  created_at DateTime @default(now())
+
+  @@index([campaign])
+  @@index([created_at])
+}
+
+model UserOnboarding {
+  id                   String            @id @default(uuid())
+  user_id              String            @unique
+  user                 User              @relation(fields: [user_id], references: [id])
+  handicap_range       HandicapRange
+  player_type          PlayerType
+  preferences          GameType[] // Array of game types
+  onboarding_completed Boolean           @default(false)
+  created_at           DateTime          @default(now())
+  updated_at           DateTime          @updatedAt
+  deleted_at           DateTime?
+  availability         UserAvailability?
+}
+
+model Profile {
+  id         String    @id @default(uuid())
+  user_id    String    @unique
+  user       User      @relation(fields: [user_id], references: [id])
+  first_name String?
+  last_name  String?
+  photo            String?
+  address_line_1   String?
+  address_line_2   String?
+  postcode         String?
+  city             String?
+  country          String?  @default("GB")
+  mobile_number    String?
+  lat              Float?
+  lng        Float?
+  handicap   Float?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+}
+
+model Follow {
+  id           String    @id @default(uuid())
+  follower_id  String
+  follower     User      @relation("follower", fields: [follower_id], references: [id])
+  following_id String
+  following    User      @relation("following", fields: [following_id], references: [id])
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+  deleted_at   DateTime?
+
+  @@unique([follower_id, following_id])
+}
+
+model FavouriteCourse {
+  id         String     @id @default(uuid())
+  user_id    String
+  user       User       @relation(fields: [user_id], references: [id])
+  course_id  String
+  course     GolfCourse @relation(fields: [course_id], references: [id])
+  created_at DateTime   @default(now())
+  updated_at DateTime   @updatedAt
+  deleted_at DateTime?
+
+  @@unique([user_id, course_id])
+}
+
+model GolfCourse {
+  id                      String            @id @default(uuid())
+  name                    String
+  lat                     Float?
+  lng                     Float?
+  address                 String?
+  saturday_9am_cost_pence Int?
+  is_bookable             Boolean           @default(false)
+  closed_down             Boolean           @default(false)
+  booking_url             String?
+  reviews                 CourseReview[]
+  condition_reports       CourseCondition[]
+  league_matches          LeagueMatch[]
+  favourites              FavouriteCourse[]
+  games                   Game[]
+  rounds                  Round[]
+  tees                    CourseTee[]
+  created_at              DateTime          @default(now())
+  updated_at              DateTime          @updatedAt
+  deleted_at              DateTime?
+}
+
+model CourseTee {
+  id          String       @id @default(uuid())
+  course_id   String
+  course      GolfCourse   @relation(fields: [course_id], references: [id])
+  tee_name    String // e.g., "White", "Yellow", "Red"
+  rating      Float? // e.g., 71.0
+  slope       Float? // e.g., 128
+  holes       CourseHole[]
+  created_at  DateTime     @default(now())
+  updated_at  DateTime     @updatedAt
+  deleted_at  DateTime?
+  Round       Round[]
+
+  @@unique([course_id, tee_name])
+}
+
+model CourseHole {
+  id         String    @id @default(uuid())
+  tee_id     String
+  tee        CourseTee @relation(fields: [tee_id], references: [id])
+  number     Int
+  yards      Int
+  par        Int
+  handicap   Int
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  @@unique([tee_id, number])
+}
+
+model CourseReview {
+  id         String     @id @default(uuid())
+  course_id  String
+  course     GolfCourse @relation(fields: [course_id], references: [id])
+  user_id    String
+  user       User       @relation(fields: [user_id], references: [id])
+  rating     Float?
+  comment    String?
+  created_at DateTime   @default(now())
+  updated_at DateTime   @updatedAt
+  deleted_at DateTime?
+}
+
+model CourseCondition {
+  id         String     @id @default(uuid())
+  course_id  String
+  course     GolfCourse @relation(fields: [course_id], references: [id])
+  condition  String
+  details    String?
+  reporter   String
+  user       User       @relation(fields: [reporter], references: [id])
+  created_at DateTime   @default(now())
+  updated_at DateTime   @updatedAt
+  deleted_at DateTime?
+}
+
+model CoursePriceThreshold {
+  id          String    @id @default(uuid())
+  locale      String
+  rating      Int
+  lower_bound Int
+  upper_bound Int
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  deleted_at  DateTime?
+}
+
+model Group {
+  id          String        @id @default(uuid())
+  name        String
+  description String?
+  banner      String?
+  image       String?
+  isPublic    Boolean       @default(true)
+  members     GroupMember[]
+  games       Game[]
+  posts       Post[]
+  created_at  DateTime      @default(now())
+  updated_at  DateTime      @updatedAt
+  deleted_at  DateTime?
+
+  Conversation Conversation?
+}
+
+model GroupMember {
+  id         String    @id @default(uuid())
+  user_id    String
+  user       User      @relation(fields: [user_id], references: [id])
+  group_id   String
+  group      Group     @relation(fields: [group_id], references: [id])
+  role       String    @default("MEMBER") // Could be ADMIN or MEMBER
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+}
+
+model League {
+  id          String     @id @default(uuid())
+  name        String
+  banner      String?
+  image       String?
+  description String?
+  startDate   DateTime
+  endDate     DateTime
+  divisions   Division[]
+  createdAt   DateTime   @default(now())
+  updated_at  DateTime   @updatedAt
+  deleted_at  DateTime?
+}
+
+model Division {
+  id         String         @id @default(uuid())
+  name       String
+  league_id  String
+  league     League         @relation(fields: [league_id], references: [id])
+  players    LeaguePlayer[]
+  matches    LeagueMatch[]
+  createdAt  DateTime       @default(now())
+  updated_at DateTime       @updatedAt
+  deleted_at DateTime?
+}
+
+model LeaguePlayer {
+  id          String              @id @default(cuid())
+  user_id     String
+  user        User                @relation(fields: [user_id], references: [id])
+  division_id String
+  division    Division            @relation(fields: [division_id], references: [id])
+  matches     LeagueMatchPlayer[]
+  createdAt   DateTime            @default(now())
+  updated_at  DateTime            @updatedAt
+  deleted_at  DateTime?
+}
+
+model LeagueMatch {
+  id          String              @id @default(cuid())
+  division_id String
+  division    Division            @relation(fields: [division_id], references: [id])
+  date        DateTime
+  course_id   String
+  course      GolfCourse          @relation(fields: [course_id], references: [id])
+  completed   Boolean             @default(false)
+  players     LeagueMatchPlayer[]
+  createdAt   DateTime            @default(now())
+  updated_at  DateTime            @updatedAt
+  deleted_at  DateTime?
+}
+
+model LeagueMatchPlayer {
+  id         String       @id @default(cuid())
+  match_id   String
+  match      LeagueMatch  @relation(fields: [match_id], references: [id])
+  player_id  String
+  player     LeaguePlayer @relation(fields: [player_id], references: [id])
+  score      Int?
+  created_at DateTime     @default(now())
+  updated_at DateTime     @updatedAt
+  deleted_at DateTime?
+}
+
+model Game {
+  id              String      @id @default(cuid())
+  name            String?
+  creator_id      String // Add this field to track who created the game
+  creator         User        @relation("CreatedGames", fields: [creator_id], references: [id])
+  date            DateTime
+  time_slot       TimeSlot // New field for time slot category
+  exact_time      String? // New field for exact time once booked
+  players_current Int
+  players_needed  Int
+  // The players_needed value at creation time. Never edited after creation, so
+  // the fill rate can be measured against the original target even if
+  // players_needed is later lowered.
+  initial_players_needed Int
+  course_id       String?
+  course          GolfCourse? @relation(fields: [course_id], references: [id])
+  group_id        String?
+  group           Group?      @relation(fields: [group_id], references: [id])
+  handicap_min    Float?
+  handicap_max    Float?
+  location        String?
+  lat             Float?
+  lng             Float?
+  distance        Int?
+
+  // New fields for enhanced game details
+  game_type          GameType
+  game_format        GameFormat?
+  organiser_handicap HandicapRange
+  total_cost         Int? // Total cost in cents
+  cost_per_player    Int? // Cost per player in cents
+
+  // Stripe and payment related fields
+  payment_status    PaymentStatus @default(PENDING)
+  stripe_session_id String? // For checkout session
+  stripe_card_id    String? // Issuing card id for virtual card
+  payout_completed  Boolean       @default(false)
+  payout_date       DateTime?
+
+  players      GamePlayer[]
+  status       GameStatus    @default(PLAYERS_REQUIRED)
+  conversation Conversation?
+  created_at   DateTime      @default(now())
+  updated_at   DateTime      @updatedAt
+  deleted_at   DateTime?
+  Transaction  Transaction[]
+  Complaint    Complaint[]
+}
+
+enum PaymentStatus {
+  PENDING
+  PARTIALLY_PAID
+  FULLY_PAID
+  REFUNDED
+  CANCELLED
+}
+
+model GamePlayer {
+  id            String       @id @default(cuid())
+  user_id       String
+  user          User         @relation(fields: [user_id], references: [id])
+  game_id       String
+  game          Game         @relation(fields: [game_id], references: [id])
+  status        PlayerStatus @default(PENDING)
+  has_approved  Boolean      @default(false)
+  invite_status InviteStatus @default(NOT_INVITED)
+
+  // Payment tracking
+  has_paid          Boolean   @default(false)
+  payment_amount    Int? // Amount paid in cents
+  payment_date      DateTime? // When payment was made
+  stripe_payment_id String? // Stripe payment intent ID
+  refunded          Boolean   @default(false)
+  refund_date       DateTime?
+
+  created_at  DateTime      @default(now())
+  updated_at  DateTime      @updatedAt
+  deleted_at  DateTime?
+  Transaction Transaction[]
+
+  @@unique([user_id, game_id])
+}
+
+enum GameStatus {
+  PLAYERS_REQUIRED
+  READY_TO_BOOK // New: Enough approved players
+  READY
+  COMPLETED
+  CANCELLED // New
+}
+
+enum PlayerStatus {
+  PENDING // Player requested to join, waiting for organizer approval
+  APPROVED // Organizer approved player, or player accepted invite
+  REJECTED // Organizer rejected player, or player declined invite
+  INVITED // New: Player has been invited by the organizer
+}
+
+enum InviteStatus {
+  PENDING // User was invited but hasn't responded
+  ACCEPTED // User accepted invitation
+  DECLINED // User declined invitation
+  NOT_INVITED // User requested to join (default state)
+}
+
+model Post {
+  id         String    @id @default(uuid())
+  content    String?
+  user_id    String
+  user       User      @relation(fields: [user_id], references: [id])
+  group_id   String?
+  group      Group?    @relation(fields: [group_id], references: [id])
+  type       PostType
+  images     Image[]
+  round      Round?
+  likes      Like[]
+  comments   Comment[]
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+}
+
+model Image {
+  id         String    @id @default(uuid())
+  url        String
+  post_id    String
+  post       Post      @relation(fields: [post_id], references: [id])
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+}
+
+model Round {
+  id                String            @id @default(cuid())
+  post_id           String            @unique
+  post              Post              @relation(fields: [post_id], references: [id])
+  course_id         String
+  course            GolfCourse        @relation(fields: [course_id], references: [id])
+  tee_id            String // Add this line
+  tee               CourseTee         @relation(fields: [tee_id], references: [id]) // Add this line
+  date              DateTime
+  scores            PlayerScore[]
+  unassigned_scores UnassignedScore[]
+  created_at        DateTime          @default(now())
+  updated_at        DateTime          @updatedAt
+  deleted_at        DateTime?
+}
+
+model PlayerScore {
+  id         String    @id @default(cuid())
+  round_id   String
+  round      Round     @relation(fields: [round_id], references: [id])
+  user_id    String
+  user       User      @relation(fields: [user_id], references: [id])
+  scores     Json // array of ints and nulls potentially
+  total      Int
+  againstPar Int
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  @@unique([round_id, user_id])
+}
+
+model UnassignedScore {
+  id         String    @id @default(cuid())
+  round_id   String
+  round      Round     @relation(fields: [round_id], references: [id])
+  scores     Json
+  total      Int
+  againstPar Int
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+}
+
+model Like {
+  id         String    @id @default(cuid())
+  user_id    String
+  user       User      @relation(fields: [user_id], references: [id])
+  post_id    String
+  post       Post      @relation(fields: [post_id], references: [id])
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  @@unique([user_id, post_id])
+}
+
+model Comment {
+  id         String    @id @default(cuid())
+  content    String
+  user_id    String
+  user       User      @relation(fields: [user_id], references: [id])
+  post_id    String
+  post       Post      @relation(fields: [post_id], references: [id])
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+}
+
+enum PostType {
+  GENERAL
+  SCORE
+}
+
+model Conversation {
+  id           String                    @id @default(cuid())
+  name         String? // For group conversations
+  type         ConversationType
+  participants ConversationParticipant[]
+  messages     Message[]
+  group        Group?                    @relation(fields: [group_id], references: [id])
+  group_id     String?                   @unique
+  game         Game?                     @relation(fields: [game_id], references: [id])
+  game_id      String?                   @unique
+  created_at   DateTime                  @default(now())
+  updated_at   DateTime                  @updatedAt
+  deleted_at   DateTime?
+
+  @@index([group_id])
+}
+
+model ConversationParticipant {
+  id              String       @id @default(cuid())
+  user_id         String
+  user            User         @relation(fields: [user_id], references: [id])
+  conversation_id String
+  conversation    Conversation @relation(fields: [conversation_id], references: [id])
+  last_read       DateTime?
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  deleted_at      DateTime?
+
+  @@unique([user_id, conversation_id])
+}
+
+model Message {
+  id              String       @id @default(cuid())
+  content         String
+  user_id         String
+  user            User         @relation(fields: [user_id], references: [id])
+  conversation_id String
+  conversation    Conversation @relation(fields: [conversation_id], references: [id])
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  deleted_at      DateTime?
+}
+
+enum ConversationType {
+  DIRECT
+  GROUP
+  GAME
+}
+
+// New enum types for the onboarding and game models
+enum HandicapRange {
+  LOW // 0-10
+  MID // 11-25
+  HIGH // 26-36
+  DONT_KNOW
+}
+
+enum PlayerType {
+  CASUAL_PLAYER
+  DEDICATED_IMPROVER
+  SERIOUS_COMPETITOR
+  NEW_TO_GOLF
+}
+
+enum GameType {
+  PURELY_SOCIAL
+  RELAXED_ROUND
+  COMPETITIVE_MATCH
+  BEGINNER_FRIENDLY
+}
+
+enum TimeSlot {
+  EARLY_MORNING // 6am-9am
+  LATE_MORNING // 9am-12pm
+  LUNCHTIME // 12pm-3pm
+  LATE_AFTERNOON // 3pm-6pm
+  EVENING // 6pm-9pm  
+}
+
+enum GameFormat {
+  MATCHPLAY
+  STROKEPLAY
+  SCRAMBLE
+  STABLEFORD
+  BEST_BALL
+  DONT_KNOW_YET
+}
+
+enum DayType {
+  WEEKDAY
+  WEEKEND
+}
+
+model UserAvailability {
+  id            String         @id @default(uuid())
+  onboarding_id String         @unique
+  onboarding    UserOnboarding @relation(fields: [onboarding_id], references: [id])
+  time_slots    UserTimeSlot[]
+  created_at    DateTime       @default(now())
+  updated_at    DateTime       @updatedAt
+  deleted_at    DateTime?
+}
+
+model UserTimeSlot {
+  id              String           @id @default(uuid())
+  availability_id String
+  availability    UserAvailability @relation(fields: [availability_id], references: [id])
+  day_type        DayType
+  time_slot       TimeSlot
+  created_at      DateTime         @default(now())
+  updated_at      DateTime         @updatedAt
+  deleted_at      DateTime?
+
+  @@unique([availability_id, day_type, time_slot])
+}
+
+model StripeAccount {
+  id                String            @id @default(uuid())
+  user_id           String            @unique
+  user              User              @relation(fields: [user_id], references: [id])
+  stripe_connect_id String            @unique
+  account_type      StripeAccountType @default(EXPRESS)
+  details_submitted Boolean           @default(false)
+  payouts_enabled   Boolean           @default(false)
+  last_event_time   DateTime?
+
+  // In-progress Custom account during Express -> Custom re-onboarding.
+  // Holds the new account id until bank + verification complete, then gets
+  // swapped into stripe_connect_id and previous_connect_id captures the
+  // old Express id.
+  pending_connect_id String?
+
+  // Populated when a row is swapped Express -> Custom during re-onboarding.
+  previous_connect_id   String?
+  previous_account_type StripeAccountType?
+  migrated_at           DateTime?
+
+  // When details_submitted first transitioned to true. Used to delay the
+  // "issue" notification so users in normal Stripe review aren't told there's
+  // a problem right after they finish onboarding.
+  details_submitted_at DateTime?
+
+  // Last time we sent the account-issue notification. Cleared when payouts
+  // become enabled, so a future regression can re-alert. Used to dedupe so
+  // we don't refire on every webhook in the same blocked state.
+  issue_notified_at DateTime?
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+}
+
+enum StripeAccountType {
+  EXPRESS
+  CUSTOM
+}
+
+// New model for storing user's latest location
+model UserLocation {
+  id         String    @id @default(uuid())
+  user_id    String    @unique // Each user has one UserLocation entry for their latest location
+  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  lat        Float // Latitude
+  lng        Float // Longitude
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime? // Optional: for soft-deleting the location record
+}
+
+// Enum for Transaction Types
+enum TransactionType {
+  PAYMENT_INTENT_CHARGE // Represents the successful charge from a PaymentIntent
+  APPLICATION_FEE // Represents the fee taken by the platform
+  APPLICATION_FEE_REFUND // Represents a refund of a previously collected application fee
+  TRANSFER // Represents funds moved to a connected account (often linked to PAYMENT_INTENT_CHARGE)
+  PAYOUT // Represents funds paid out from a connected account to their bank
+  REFUND // Represents a refund to a customer
+  TRANSFER_REVERSAL // Represents a reversal of a transfer due to a refund
+  PLATFORM_ADJUSTMENT // For other platform-initiated balance adjustments
+}
+
+// Enum for Transaction Statuses
+enum TransactionStatus {
+  PENDING // Transaction is initiated but not yet completed
+  SUCCEEDED // Transaction completed successfully
+  FAILED // Transaction failed
+  PROCESSING // Transaction is being processed (e.g., payout in transit)
+  CANCELED // Transaction was canceled
+  REQUIRES_ACTION // Further action is needed
+  REQUIRES_CAPTURE // PaymentIntent requires capture
+}
+
+// New model for storing financial transactions
+model Transaction {
+  id          String            @id @default(cuid())
+  type        TransactionType // Type of the transaction
+  status      TransactionStatus // Status of the transaction
+  amount      Int // Amount in the smallest currency unit (e.g., cents, pence)
+  currency    String // Three-letter ISO currency code
+  description String? // Optional description for the transaction
+
+  user_id String? // ID of the user primarily associated (e.g., payer, or recipient of payout)
+  user    User?   @relation(fields: [user_id], references: [id])
+
+  game_id String? // Optional: If related to a specific game
+  game    Game?   @relation(fields: [game_id], references: [id])
+
+  game_player_id String? // Optional: If the transaction is specific to a player in a game (e.g., their entry fee payment)
+  gamePlayer     GamePlayer? @relation(fields: [game_player_id], references: [id])
+
+  // Stripe Object IDs - store the relevant ID based on the transaction type
+  stripe_payment_intent_id         String? // For PAYMENT_INTENT_CHARGE, REFUND
+  stripe_charge_id                 String? // Often associated with a PaymentIntent
+  stripe_refund_id                 String? @unique // For REFUND
+  stripe_payout_id                 String? @unique // For PAYOUT
+  stripe_transfer_id               String? // For TRANSFER, REFUND_REVERSAL
+  stripe_transfer_reversal_id      String? @unique // For TRANSFER_REVERSAL
+  stripe_balance_transaction_id    String? @unique // Can be useful for reconciliation
+  stripe_application_fee_id        String? @unique // For APPLICATION_FEE
+  stripe_application_fee_refund_id String? @unique // For APPLICATION_FEE_REFUND
+  stripe_customer_id               String? // Stripe Customer ID of the payer
+  stripe_connected_account_id      String? // Stripe Connected Account ID involved
+
+  // For linking related transactions, e.g., a refund to its original payment
+  related_stripe_object_id String? // e.g., if this is a REFUND, this could be the stripe_payment_intent_id of the charge
+
+  metadata Json? // For storing additional context or parts of the Stripe object
+
+  last_event_time DateTime? // Timestamp of the last processed Stripe event for this transaction
+  created_at      DateTime              @default(now())
+  updated_at      DateTime              @updatedAt
+  deleted_at      DateTime?
+  processed_at    DateTime? // When the transaction was confirmed as succeeded/failed by Stripe webhook
+  event_logs      TransactionEventLog[] // Relation to the event log
+
+  @@unique([stripe_payment_intent_id, type])
+}
+
+// New model for logging all transaction-related events
+model TransactionEventLog {
+  id             String      @id @default(cuid())
+  transaction_id String // Foreign key to the main Transaction table's id
+  transaction    Transaction @relation(fields: [transaction_id], references: [id])
+
+  stripe_event_id   String @unique // Stripe's event ID (evt_...)
+  stripe_event_type String // e.g., 'payment_intent.succeeded', 'refund.updated'
+
+  status TransactionStatus // The TransactionStatus resulting from this event
+
+  details Json? // Store event.data.object or relevant parts
+  notes   String? // Any internal notes about processing this event
+
+  stripe_event_created_at DateTime // Timestamp from Stripe event.created (seconds epoch to DateTime)
+  created_at              DateTime  @default(now())
+  updated_at              DateTime  @updatedAt
+  deleted_at              DateTime?
+}
+
+// === Complaints ===
+
+enum ComplaintStatus {
+  PENDING
+  IN_REVIEW
+  RESOLVED
+  REFUNDED
+  REJECTED
+}
+
+enum ComplaintType {
+  ORGANISER_DID_NOT_BOOK
+  GAME_CANCELLED_WITHOUT_NOTICE
+  OTHER
+}
+
+model Complaint {
+  id             String          @id @default(cuid())
+  game_id        String
+  game           Game            @relation(fields: [game_id], references: [id])
+  complainant_id String
+  complainant    User            @relation("ComplaintComplainant", fields: [complainant_id], references: [id])
+  type           ComplaintType
+  description    String
+  status         ComplaintStatus @default(PENDING)
+
+  resolved_by String?
+  resolver    User?   @relation("ComplaintResolver", fields: [resolved_by], references: [id])
+  resolution  String?
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  @@index([game_id])
+  @@index([complainant_id])
+  @@index([resolved_by])
+}
+
+// === Notifications ===
+
+enum NotificationType {
+  GAME
+  CHAT
+  FOLLOW
+  GENERAL
+}
+
+model PushToken {
+  id         String                 @id @default(cuid())
+  user_id    String
+  user       User                   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  token      String                 @unique
+  platform   String // "ios" or "android"
+  is_active  Boolean                @default(true)
+  created_at DateTime               @default(now())
+  updated_at DateTime               @updatedAt
+  deleted_at DateTime?
+  deliveries NotificationDelivery[]
+
+  @@index([user_id])
+  @@index([token])
+}
+
+model Notification {
+  id         String                 @id @default(cuid())
+  user_id    String
+  user       User                   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  title      String
+  body       String
+  data       Json? // Additional notification data
+  type       NotificationType
+  read       Boolean                @default(false)
+  created_at DateTime               @default(now())
+  updated_at DateTime               @updatedAt
+  deleted_at DateTime?
+  deliveries NotificationDelivery[]
+
+  @@index([user_id])
+  @@index([user_id, read])
+  @@index([type])
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  SENT
+  ERROR
+}
+
+model NotificationDelivery {
+  id              String                     @id @default(cuid())
+  notification_id String
+  notification    Notification               @relation(fields: [notification_id], references: [id], onDelete: Cascade)
+  push_token_id   String?
+  push_token      PushToken?                 @relation(fields: [push_token_id], references: [id], onDelete: SetNull)
+  token           String // Snapshot of the push token string at send time
+  ticket_id       String? // Expo ticket id, used to fetch receipts later
+  status          NotificationDeliveryStatus @default(PENDING)
+  error_code      String? // Expo error code e.g. DeviceNotRegistered
+  error_message   String?
+  created_at      DateTime                   @default(now())
+  updated_at      DateTime                   @updatedAt
+
+  @@index([notification_id])
+  @@index([ticket_id])
+  @@index([status])
+}
+
+model NotificationSettings {
+  id                    String    @id @default(cuid())
+  user_id               String    @unique
+  user                  User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  game_notifications    Boolean   @default(true)
+  chat_notifications    Boolean   @default(true)
+  follow_notifications  Boolean   @default(true)
+  general_notifications Boolean   @default(true)
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @updatedAt
+  deleted_at            DateTime?
+
+  @@index([user_id])
+}
+
+// === Moderation: Reports & Blocks ===
+
+enum ReportTargetType {
+  USER
+  CONVERSATION
+  GAME
+}
+
+enum ReportReason {
+  SPAM
+  HARASSMENT
+  HATE_SPEECH
+  NSFW
+  SCAM
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  ACTIONED
+  DISMISSED
+}
+
+model Report {
+  id          String           @id @default(cuid())
+  reporter_id String
+  reporter    User             @relation("UserReports", fields: [reporter_id], references: [id])
+  target_type ReportTargetType
+
+  target_user_id         String?
+  target_conversation_id String?
+  target_game_id         String?
+
+  reason            ReportReason
+  description       String?
+  status            ReportStatus @default(PENDING)
+  moderation_action String?
+  created_at        DateTime     @default(now())
+  updated_at        DateTime     @updatedAt
+  deleted_at        DateTime?
+
+  @@index([reporter_id])
+  @@index([target_user_id])
+  @@index([target_conversation_id])
+  @@index([target_game_id])
+}
+
+model Block {
+  id         String    @id @default(cuid())
+  blocker_id String
+  blocker    User      @relation("Blocker", fields: [blocker_id], references: [id])
+  blocked_id String
+  blocked    User      @relation("Blocked", fields: [blocked_id], references: [id])
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  @@unique([blocker_id, blocked_id])
+  @@index([blocker_id])
+  @@index([blocked_id])
+}

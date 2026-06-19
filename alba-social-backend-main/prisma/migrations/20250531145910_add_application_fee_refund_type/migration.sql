@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "TransactionType" ADD VALUE 'APPLICATION_FEE_REFUND';

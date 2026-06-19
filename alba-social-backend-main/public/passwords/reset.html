@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Reset your Alba password</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #000;
+        color: #fff;
+        font-family:
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          Roboto,
+          sans-serif;
+        height: 100%;
+      }
+      .wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        padding: 24px;
+        text-align: center;
+      }
+      h1 {
+        font-weight: 300;
+        margin: 0 0 12px;
+      }
+      p {
+        color: #959596;
+        margin: 0 0 24px;
+        max-width: 360px;
+        line-height: 1.5;
+      }
+      a.button {
+        display: inline-block;
+        padding: 14px 24px;
+        border-radius: 999px;
+        background: #fff;
+        color: #000;
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .small {
+        font-size: 13px;
+        margin-top: 24px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Opening Alba…</h1>
+      <p>
+        We're handing you off to the Alba app to finish resetting your password.
+      </p>
+      <a id="open" class="button" href="#">Open Alba</a>
+      <p class="small">
+        If nothing happens, make sure the Alba app is installed and tap the
+        button above.
+      </p>
+    </div>
+    <script>
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var mode = params.get("mode");
+        var oobCode = params.get("oobCode");
+        // Only handle password reset; other Firebase action modes (verifyEmail,
+        // recoverEmail, etc.) aren't wired up here.
+        if (mode !== "resetPassword" || !oobCode) {
+          document.querySelector("h1").textContent = "Invalid reset link";
+          document.querySelector("p").textContent =
+            "This link is missing required information. Please request a new password reset email from the app.";
+          document.getElementById("open").style.display = "none";
+          return;
+        }
+
+        var deepLink =
+          "alba://reset-password?oobCode=" + encodeURIComponent(oobCode);
+        document.getElementById("open").href = deepLink;
+        // Auto-redirect; the visible button is a fallback if the OS blocks it.
+        window.location.replace(deepLink);
+      })();
+    </script>
+  </body>
+</html>

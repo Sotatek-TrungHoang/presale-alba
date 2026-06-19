@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.davros.alba",
+      "sha256_cert_fingerprints": [
+        "72:6F:EE:2A:B9:EA:7B:F6:A2:E1:69:05:85:CF:C8:CC:DA:E2:1E:00:2F:2F:1A:EE:19:AD:3D:7F:E1:E2:12:CA",
+        "81:8C:C1:BE:24:F8:93:E1:1D:7B:DD:9E:43:79:8A:5B:C6:E2:4B:62:D4:9A:E8:79:CC:15:83:FC:91:78:A4:F3"
+      ]
+    }
+  }
+]
